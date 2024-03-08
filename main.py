@@ -1,17 +1,11 @@
-import time
+from time import sleep
 import os
+import sys
 h,v,bt,tb = "Horizontal", "Vertical", "BottomTop", "TopBottom"
 H,V,BT,TB = h,v,bt,tb
-grid = [
-  ["|  ","|  ","|  ","|  ","|  ","|  ","|  "],
-  ["|  ","|  ","|  ","|  ","|  ","|  ","|  "],
-  ["|  ","|  ","|  ","|  ","|  ","|  ","|  "],
-  ["|  ","|  ","|  ","|  ","|  ","|  ","|  "],
-  ["|  ","|  ","|  ","|  ","|  ","|  ","|  "],
-  ["|  ","|  ","|  ","|  ","|  ","|  ","|  "],
-]
 
-clear = lambda : os.system("clear")
+grid = []
+clear = lambda : os.system("cls")
 
 class Connect:
   def __init__(self,spaces,direction):
@@ -22,13 +16,14 @@ class Connect:
         for thing in space.Connect[direction].Spaces:
           self.Spaces.append(thing)
     self.Spaces = set(self.Spaces)
-    self.Length = len(spaces)
+    self.Length = len(self.Spaces)
+    self.Player = spaces[0].Display
     for space in self.Spaces:
       space.Connect[direction] = self
       
 class Space:
   def __init__(self,y,x):
-    self.Player = None
+    self.Display = "|   "
     self.X = x
     self.Y = y
     self.Connect = {
@@ -37,17 +32,17 @@ class Space:
       "BottomTop":None,
       "TopBottom":None
     }
-
-  def __str__(self):
-    return str(self.Y) + "," + str(self.X)
-
-  def returnAdjacentSpaces(self):
     self.Adjacent = {
       "Horizontal":[],
       "Vertical":[],
       "BottomTop":[],
       "TopBottom":[]
     }
+
+  def __str__(self):
+    return self.Display
+
+  def updateAdjacentSpaces(self):
     for i in range(-1,2,2):
       if self.Y + i in range(0,len(grid)):
         self.Adjacent[V].append(grid[self.Y+i][self.X])
@@ -57,19 +52,78 @@ class Space:
         self.Adjacent[BT].append((grid[self.Y-i][self.X+i]))
       if self.X + i in range(0,len(grid[self.Y])) and self.Y + i in range(0,len(grid)):
         self.Adjacent[TB].append((grid[self.Y+i][self.X+i]))
-    return self
 
-  def updateConnect(self,player):
+  def updateConnect(self,Display):
     for value in self.Adjacent:
       for thing in self.Adjacent[value]:
-        if thing.Player == player:
+        if thing.Display == Display:
           Connect([self,thing],value)
     return self
 
-grid = [[Space(j,i) for i in range(len(grid[j]))] for j in range(len(grid))]
-grid = [[grid[j][i].returnAdjacentSpaces() for i in range(len(grid[j]))] for j in range(len(grid))]
+def printGrid(user=None):
+  clear()
+  if user != None:
+    print(f"Player {user}, choose a place to drop a counter:\n")
+  for i in range(len(grid[0])):
+    sys.stdout.write("  "+ str(i+1)+ " ")
+  print("")
+  for i in range(len(grid)):
+    for j in range(len(grid[i])):
+      addon = ""
+      if j == len(grid[i])-1:
+        addon = "|"
+      sys.stdout.write(str(grid[i][j])+addon)
+    print("\n-----------------------------")
 
-connectSpaces = grid[3][2].updateConnect(True).Connect[TB].Spaces
-connectSpaces = grid[4][3].Connect[TB].Spaces
-for i in connectSpaces:
-  print(i)
+def addToGrid(counter, column):
+  i=0
+  if grid[i][column].Display != "|   ":
+    return "Error"
+  while True:
+    if i+1 >= len(grid):
+      grid[i][column].Display = counter
+      return grid[i][column].Y,grid[i][column].X
+    elif grid[i+1][column].Display != "|   ":
+      grid[i][column].Display = counter
+      return grid[i][column].Y,grid[i][column].X
+    else:
+      i += 1
+
+length = 7
+height = 6
+for i in range(height):
+  grid.append([])
+  for j in range(length):
+    grid[i].append(Space(i,j))
+for i in range(len(grid)):
+  for j in range(len(grid[i])):
+    grid[i][j].updateAdjacentSpaces()
+
+playing = True
+players = {
+  -1: "| X ",
+  1: "| O "
+}
+step = -1
+while playing:
+  global currentPlayer
+  currentPlayer = str(int((1/4)*((step+1)**2)+1)) #Quadratic where x=-1 y=1, x=1 y=2
+  playerCounter = players[step]
+  printGrid(currentPlayer)
+  try:
+    choice = int(input())
+    if type(choice)!= int or choice < 1 or choice > len(grid[0]):
+      continue
+  except ValueError:
+    continue
+  c = addToGrid(playerCounter,choice-1)
+  if c != "Error":
+    newSpace = grid[c[0]][c[1]]
+    newSpace.updateConnect(playerCounter)
+    for i in newSpace.Connect:
+      if newSpace.Connect[i] != None: #Combine into one if statement?
+        if newSpace.Connect[i].Length >= 4:
+          printGrid()
+          print(f"Player {currentPlayer} wins!!!!")
+          quit()
+    step *= -1
